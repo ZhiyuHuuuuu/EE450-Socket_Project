@@ -29,8 +29,8 @@ using namespace std;
 #define COUNTRY "xYz" // used for test
 #define USER "0"
 
-const string FILE_NAME = "testcases/testcase2/data1.txt";
-//const string FILE_NAME = "test.txt";
+const string FILE_NAME = "testcases/testcase3/data1.txt";
+//const string FILE_NAME = "test1.txt";
 
 int sockfdUDP;
 struct sockaddr_in serverAddrUDP, clientAddrUDP;
@@ -73,6 +73,8 @@ int main() {
     while(true)
     {
         // receive data from main server
+        cout << "size of recvBuf: " << sizeof(recvBuf) << endl;
+        memset(recvBuf,'\0',sizeof(recvBuf));
         socklen_t serverAUDPLen = sizeof(clientAddrUDP);
         if (::recvfrom(sockfdUDP, recvBuf, MAX_DATA_SIZE, 0, (struct sockaddr *) &clientAddrUDP, &serverAUDPLen) == ERROR_FLAG) {
             perror("serverA receive failed");
@@ -101,13 +103,14 @@ int main() {
             cout << "The server A has received request for finding possible friends of User " << userID << " in " << countryName << endl;
             // get recommendation
             string result = getRecommendation(countryName, userID);
-            cout << result << endl;
+            cout << "recommendation is: " << result << endl;
             // send query result back to mainserver
             sendResult(result, userID, countryName);
-            break;
         }
     }
     close(sockfdUDP);
+    return 0;
+
 }
 
 /**
@@ -284,7 +287,7 @@ string getRecommendation(string countryName, string userID) {
     vector<int> indexToID = indexToIDMap[countryName];
 
     if (reindexMap.count(userID) == 0) {
-        return "NF";
+        return "userIDNF";
     }
     // case1.a: only user in the graph
     if (matrix.size() == 1) {
@@ -398,7 +401,7 @@ void bootUpServerA() {
 }
 
 void sendResult(string result, string userID, string countryName) {
-    if (result == "NF") {
+    if (result == "userIDNF") {
         cout << "User " << userID << " does not show up in "<< countryName << endl;
         // send data to main server
         string message = result;

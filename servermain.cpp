@@ -27,15 +27,17 @@ using namespace std;
 #define SERVER_B_PORT 31500
 #define MAIN_UDP_PORT 32500
 #define MAIN_TCP_PORT 33500
+#define BACKLOG 100 // A country will have at least one user, and at most 100 users
 
-int sockfd_client_TCP, sockfd_monitor_TCP, sockfdUDP; // Parent socket for client & for monitor & UDP socket
-int child_sockfd_client, child_sockfd_monitor; // Child socket for connection with client and monitor
-struct sockaddr_in aws_client_addr, aws_monitor_addr, mainUDPAddr;
-struct sockaddr_in dest_client_addr, dest_monitor_addr, destServerAAddr, destServerBAddr; // When AWS works as a client
+int sockfdClient, sockfdUDP; // Parent socket for client & for monitor & UDP socket
+int childSockfdClient; // Child socket for connection with client and monitor
+struct sockaddr_in mainClientAddr, mainUDPAddr;
+struct sockaddr_in destClientAddr, destServerAAddr, destServerBAddr; // When AWS works as a client
 
 char clientInput[MAX_DATA_SIZE]; // Input data from client
 char AResult[MAX_DATA_SIZE]; // Computed data returned from server A
 char BResult[MAX_DATA_SIZE]; // Computed data returned from server B
+char serverResult[MAX_DATA_SIZE];
 
 const string BOOT_UP_MSG = "Bootup";
 unordered_map<string, int> countryMap;
@@ -43,22 +45,33 @@ unordered_map<string, int> countryMap;
 const string COUNTRY = "jpYsAHXfNwOVKaFk";
 const string USER = "898";
 
+const string USER_RESULT = "20";
+
+// 1. Create TCP socket w/ client & bind socket
+void createClientTCPSocket();
+
+// 4. Listen for client
+void listenClient();
+
 void createUDPSocket();
 void connectToServerA();
 void connectToServerB();
 vector<string> bootUpServerA(vector<string> countryForA);
 vector<string> bootUpServerB(vector<string> countryForB);
-void queryServerA();
-void queryServerB();
-
-
 void printCountryList(vector<string> countryForA, vector<string> countryForB);
+void queryServerA(string input);
+void queryServerB(string input);
+void sendAResultToClient(string userID, string country);
+void sendBResultToClient(string userID, string country);
+
 
 int main() {
 
     vector<string> countryForA;
     vector<string> countryForB;
     createUDPSocket();
+    createClientTCPSocket();
+    listenClient();
     cout << "The Main server is up and running." << endl;
 
     /**********************************************************************************
@@ -74,14 +87,106 @@ int main() {
     ******************************** Phase 2--Query  *********************************
     **********************************************************************************/
 
+    /******    Step 6: Accept connection from client using child socket   ******/
+    socklen_t clientAddrSize = sizeof(destClientAddr);
+
+    // Accept listening socket (parent)
+    childSockfdClient = ::accept(sockfdClient, (struct sockaddr *) &destClientAddr, &clientAddrSize);
+    if (childSockfdClient == ERROR_FLAG) {
+        perror("[ERROR] AWS server: fail to accept connection with client");
+        exit(1);
+    }
+
     while(true) {
-        queryServerA();
-        queryServerB();
-        break;
+
+        /******    Step 8: Receive input from client: write / compute   ******/
+        /******    Beej's Notes  ******/
+        memset(&clientInput, 0, sizeof(clientInput));
+        // Receive through child socket
+        if (recv(childSockfdClient, clientInput, MAX_DATA_SIZE, 0) == ERROR_FLAG) {
+            perror("[ERROR] main server: fail to receive input data from client");
+            exit(1);
+        }
+        cout << "The client input is " << clientInput << endl;
+
+        char *splitStr = strtok(clientInput,"|");
+        string userID = splitStr;
+        splitStr = strtok(NULL,"|");
+        string country = splitStr;
+
+        cout << "The Main server has received the request on User " << userID;
+        cout << " in " << country << " from client using TCP over port " << MAIN_TCP_PORT << endl;
+
+        // case1: country name could not be found
+        if (countryMap.count(country) == 0) {
+            cout << country << " does not show up in server A&B"<< endl;
+            string CountryNFResult = "CountryNF";
+            memset(&serverResult, 0, sizeof(serverResult));
+            strncpy(serverResult, CountryNFResult.c_str(), CountryNFResult.length() + 1);
+            // Send CountryNF result to client
+            if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+                       0,(struct sockaddr *) &destClientAddr,
+                       sizeof(destClientAddr)) == ERROR_FLAG) {
+                perror("[ERROR] main: fail to send computed result to client");
+                exit(1);
+            }
+            cout << "The Main Server has sent \"Country Name: Not found\" to client using TCP over port ";
+            cout << MAIN_TCP_PORT << endl;
+
+        }
+        else {
+            cout << country << " shows up in server A&B"<< endl;
+            if (countryMap[country] == 0) {
+                sendAResultToClient(userID, country);
+            } else {
+                sendBResultToClient(userID, country);
+            }
+        }
+
+//        memset(&serverResult, 0, sizeof(serverResult));
+//        strncpy(serverResult, USER_RESULT.c_str(), USER_RESULT.length() + 1);
+//        // Send compute result to client
+//        if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+//                   0,(struct sockaddr *) &destClientAddr,
+//                   sizeof(destClientAddr)) == ERROR_FLAG) {
+//            perror("[ERROR] main: fail to send computed result to client");
+//            exit(1);
+//        }
     }
     close(sockfdUDP);
+    close(sockfdClient);
+    return 0;
 
 }
+
+void createClientTCPSocket() {
+    sockfdClient = socket(AF_INET, SOCK_STREAM, 0); // Create TCP socket
+    if (sockfdClient == ERROR_FLAG) {
+        perror("[ERROR] Main server: fail to create socket for client");
+        exit(1);
+    }
+
+    // Initialize IP address, port number
+    memset(&mainClientAddr, 0, sizeof(mainClientAddr)); //  make sure the struct is empty
+    mainClientAddr.sin_family = AF_INET; // Use IPv4 address family
+    mainClientAddr.sin_addr.s_addr = inet_addr(LOCAL_HOST); // Host IP address
+    mainClientAddr.sin_port = htons(MAIN_TCP_PORT); // Port number for client
+
+    // Bind socket for client with IP address and port number for client
+    if (::bind(sockfdClient, (struct sockaddr *) &mainClientAddr, sizeof(mainClientAddr)) == ERROR_FLAG) {
+        perror("[ERROR] Main server: fail to bind client socket");
+        exit(1);
+    }
+
+}
+
+void listenClient() {
+    if (listen(sockfdClient, BACKLOG) == ERROR_FLAG) {
+        perror("[ERROR] main server: fail to listen for client socket");
+        exit(1);
+    }
+}
+
 
 /**
  * Step 3: Create UDP socket and bind socket
@@ -144,6 +249,7 @@ void printCountryList(vector<string> countryForA, vector<string> countryForB) {
 
 vector<string> bootUpServerA(vector<string> countryForA) {
     char dataBuff[MAX_DATA_SIZE];
+    memset(dataBuff,'\0',sizeof(dataBuff));
     strncpy(dataBuff, BOOT_UP_MSG.c_str(), BOOT_UP_MSG.length() + 1);
 
     // Send to server A to ask for country list
@@ -156,6 +262,7 @@ vector<string> bootUpServerA(vector<string> countryForA) {
     cout << "send boot up query to server A" << endl; // used for test
 
     // Receive from Server A to get the country list
+    memset(AResult,'\0',sizeof(AResult));
     socklen_t destServerASize = sizeof(destServerAAddr);
     if (::recvfrom(sockfdUDP, AResult, MAX_DATA_SIZE, 0, (struct sockaddr *) &destServerAAddr,
                    &destServerASize) == ERROR_FLAG) {
@@ -182,6 +289,7 @@ vector<string> bootUpServerA(vector<string> countryForA) {
 
 vector<string> bootUpServerB(vector<string> countryForB) {
     char dataBuff[MAX_DATA_SIZE];
+    memset(dataBuff,'\0',sizeof(dataBuff));
     strncpy(dataBuff, BOOT_UP_MSG.c_str(), BOOT_UP_MSG.length() + 1);
 
     // Send to server B to ask for country list
@@ -192,7 +300,7 @@ vector<string> bootUpServerB(vector<string> countryForB) {
         exit(1);
     }
     cout << "send boot up query to server A" << endl; // used for test
-
+    memset(BResult,'\0',sizeof(BResult));
     // Receive from Server B to get the country list
     socklen_t destServerBSize = sizeof(destServerBAddr);
     if (::recvfrom(sockfdUDP, BResult, MAX_DATA_SIZE, 0, (struct sockaddr *) &destServerBAddr,
@@ -216,11 +324,13 @@ vector<string> bootUpServerB(vector<string> countryForB) {
     return countryForB;
 }
 
-void queryServerA() {
+void queryServerA(string input) {
     char dataBuff[MAX_DATA_SIZE];
-    strncpy(dataBuff, clientInput, strlen(clientInput));
-    string msg = USER + "|" + COUNTRY;
-    strncpy(dataBuff, msg.c_str(), msg.length() + 1);
+    memset(dataBuff,'\0',sizeof(dataBuff));
+    cout << "dataBuff in queryServerA: "<< dataBuff << endl;
+    strncpy(dataBuff, input.c_str(), strlen(input.c_str()));
+//    string msg = USER + "|" + COUNTRY;
+//    strncpy(dataBuff, msg.c_str(), msg.length() + 1);
 
     // Send to server A
     connectToServerA();
@@ -245,13 +355,14 @@ void queryServerA() {
 }
 
 
-void queryServerB() {
+void queryServerB(string input) {
     char dataBuff[MAX_DATA_SIZE];
-    strncpy(dataBuff, clientInput, strlen(clientInput));
+    memset(dataBuff,'\0',sizeof(dataBuff));
+    strncpy(dataBuff, input.c_str(), strlen(input.c_str()));
 //    string msg = USER + "|" + COUNTRY;
-    string msg = "385|TQanqBFWKjJUmhlk";
-
-    strncpy(dataBuff, msg.c_str(), msg.length() + 1);
+//    string msg = "385|TQanqBFWKjJUmhlk";
+//
+//    strncpy(dataBuff, msg.c_str(), msg.length() + 1);
 
     // Send to server B
     connectToServerB();
@@ -273,4 +384,78 @@ void queryServerB() {
 //        printf("The MAIN received response from Backend-Server A for writing using UDP over port <%d> \n",
 //               MAIN_UDP_PORT);
     cout << "get response from server B:" << BResult << endl;
+}
+
+
+void sendAResultToClient(string userID, string country) {
+    cout << "The Main Server has sent request from User ";
+    cout <<  userID << " to server A ";
+    cout << "using UDP over port " <<  MAIN_UDP_PORT << endl;
+    string input = userID + "|" + country;
+    cout << "input in sendAResultToClient is: "<< input<< endl;
+    queryServerA(input);
+    string result = AResult;
+    // case2: could find this user ID
+    if (result == "userIDNF") {
+        cout << "The Main server has received \"User ID: Not found\" from server A" << endl;
+        memset(&serverResult, 0, sizeof(serverResult));
+        strncpy(serverResult, result.c_str(), result.length() + 1);
+        // Send userIDNF result to client
+        if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+                   0,(struct sockaddr *) &destClientAddr,
+                   sizeof(destClientAddr)) == ERROR_FLAG) {
+            perror("[ERROR] main: fail to send computed result to client");
+            exit(1);
+        }
+        cout << "The Main Server has sent error to client using TCP over "<< MAIN_TCP_PORT << endl;
+    } else {  // case3:  find this user ID
+        cout << "The Main server has received searching result(s) of User " << userID << " from server A" << endl;
+        memset(&serverResult, 0, sizeof(serverResult));
+        strncpy(serverResult, result.c_str(), result.length() + 1);
+        // Send userID result to client
+        if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+                   0,(struct sockaddr *) &destClientAddr,
+                   sizeof(destClientAddr)) == ERROR_FLAG) {
+            perror("[ERROR] main: fail to send computed result to client");
+            exit(1);
+        }
+        cout << "The Main Server has sent searching result(s) to client using TCP over port "<< MAIN_TCP_PORT << endl;
+    }
+}
+
+void sendBResultToClient(string userID, string country) {
+    cout << "The Main Server has sent request from User ";
+    cout <<  userID << "to server B ";
+    cout << "using UDP over port" <<  MAIN_UDP_PORT << endl;
+    string input = userID + "|" + country;
+    cout << "input in sendBResultToClient is: "<< input<< endl;
+
+    queryServerB(input);
+    string result = BResult;
+    // case2: could find this user ID
+    if (result == "userIDNF") {
+        cout << "The Main server has received \"User ID: Not found\" from server B" << endl;
+        memset(&serverResult, 0, sizeof(serverResult));
+        strncpy(serverResult, result.c_str(), result.length() + 1);
+        // Send userIDNF result to client
+        if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+                   0,(struct sockaddr *) &destClientAddr,
+                   sizeof(destClientAddr)) == ERROR_FLAG) {
+            perror("[ERROR] main: fail to send computed result to client");
+            exit(1);
+        }
+        cout << "The Main Server has sent error to client using TCP over "<< MAIN_TCP_PORT << endl;
+    } else {  // case3:  find this user ID
+        cout << "The Main server has received searching result(s) of User " << userID << " from server B" << endl;
+        memset(&serverResult, 0, sizeof(serverResult));
+        strncpy(serverResult, result.c_str(), result.length() + 1);
+        // Send userID result to client
+        if (sendto(childSockfdClient, serverResult, sizeof(serverResult),
+                   0,(struct sockaddr *) &destClientAddr,
+                   sizeof(destClientAddr)) == ERROR_FLAG) {
+            perror("[ERROR] main: fail to send computed result to client");
+            exit(1);
+        }
+        cout << "The Main Server has sent searching result(s) to client using TCP over port "<< MAIN_TCP_PORT << endl;
+    }
 }

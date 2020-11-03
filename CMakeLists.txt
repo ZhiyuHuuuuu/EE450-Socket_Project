@@ -7,5 +7,5 @@ add_executable(sokcet_project
                servermain.cpp
                serverA.cpp
                serverB.cpp
-        client.cpp
+               client.cpp
         )
