@@ -1,0 +1,29 @@
+----------------------------------------------------------------
+                      country name    num users    num relations
+----------------------------------------------------------------
+                          BDLJzPUG           90             4578
+                               Cab           89             3738
+                               cCb           87             4232
+                             fZlUg          107             3236
+                          yUXpIilh           91             4220
+                             BSYqz           91             3398
+                          SbvedgUc           96             3334
+                          hSUMJxvw           90             4650
+                 wUtyLVMQelbBIJuap           74             3534
+                            cYLEUu           98             4194
+----------------------------------------------------------------
+num graphs                      10
+----------------------------------------------------------------
+
+
+RECEIVED USER QUERY: 929273767 in cCb
+>>>> recommend new friend 722879238 to user 929273767 (common neighbors = 30)
+
+RECEIVED USER QUERY: 162118937 in hSUMJxvw
+>>>> recommend new friend 313820140 to user 162118937 (common neighbors = 37)
+
+RECEIVED USER QUERY: 95542459 in SbvedgUc
+>>>> recommend new friend 80727518 to user 95542459 (common neighbors = 15)
+
+RECEIVED USER QUERY: 468761846 in cYLEUu
+>>>> recommend new friend 272778285 to user 468761846 (common neighbors = 30)

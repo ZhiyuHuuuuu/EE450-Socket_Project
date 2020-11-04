@@ -25,17 +25,16 @@ using namespace std;
 #define LOCAL_HOST "127.0.0.1"
 #define MAX_DATA_SIZE 1024
 #define ERROR_FLAG -1
+#define FILE_NAME "data2.txt"
 
-#define COUNTRY "xYz" // used for test
-#define USER "0"
 
-const string FILE_NAME = "testcases/testcase3/data2.txt";
+
+//const string FILE_NAME = "testcases/testcase3/data2.txt";
 //const string FILE_NAME = "test2.txt";
 
 int sockfdUDP;
 struct sockaddr_in serverBddrUDP, clientBddrUDP;
-char recvBuf[MAX_DATA_SIZE]; // Data sent by client: write / compute
-char writeResult[MAX_DATA_SIZE]; // Get from server B Send to AWS
+char recvBuf[MAX_DATA_SIZE];
 
 unordered_map<string, vector<vector<int>>> fileMap;
 unordered_map<string, unordered_map<string, int>> indexMap;
@@ -61,13 +60,8 @@ int main() {
 
 
     processFiles();
-
     // create UDP socket for server B
     createUDPSocket();
-
-//    // get recommendation
-//    string result = getRecommendation(COUNTRY, USER);
-//    cout << result << endl;
 
     while(true)
     {
@@ -78,7 +72,7 @@ int main() {
             perror("serverB receive failed");
             exit(1);
         }
-        printf("The Server B received input <%s>\n", recvBuf); // debug Test
+//        printf("The Server B received input <%s>\n", recvBuf); // debug Test
         string recvMsg = recvBuf;
         // boot up message
         if (recvMsg == "Bootup") {
@@ -92,16 +86,17 @@ int main() {
             splitStr = strtok(NULL,"|");
             countryName = splitStr;
 
-            /* debug info */
-            cout << endl;
-            cout << "userID is: " << userID << endl;
-            cout << "countryName is: "<< countryName << endl;
-            cout << endl;
-            /*  debug info */
+//            /* debug info */
+//            cout << endl;
+//            cout << "userID is: " << userID << endl;
+//            cout << "countryName is: "<< countryName << endl;
+//            cout << endl;
+//            /*  debug info */
+
             cout << "The server B has received request for finding possible friends of User " << userID << " in " << countryName << endl;
             // get recommendation
             string result = getRecommendation(countryName, userID);
-            cout << "recommendation is: " << result << endl;
+//            cout << "recommendation is: " << result << endl;
             // send query result back to mainserver
             sendResult(result, userID, countryName);
         }
@@ -176,21 +171,8 @@ void processFiles() {
 
 //
 }
-//     debug message
-//    unordered_map<string, int> indexTest = indexMap[COUNTRY];
-//    cout << "index Map: "<<endl;
-//    for (auto it = indexTest.begin(); it != indexTest.end(); ++it) {
-//        cout << it->first << ":" << it->second<< endl;
-//
-//    }
-//    vector<vector<int>> fileTest = fileMap[COUNTRY];
-//    cout << "adjacency matrix: "<<endl;
-//    for(int i = 0; i < fileTest.size(); i++) {
-//        for (int j = 0; j < fileTest[i].size(); j++) {
-//            cout << fileTest[i][j];
-//        }
-//        cout << endl;
-//    }
+
+
 /**
  * This method helps to get adjacency matrix
  * @param map key is every country user ID, value is the userID line
@@ -274,14 +256,14 @@ string getRecommendation(string countryName, string userID) {
     }
     // case1.a: only user in the graph
     if (matrix.size() == 1) {
-        cout << "case1.a: only user in the graph" << endl; // used for test
+//        cout << "case1.a: only user in the graph" << endl; // used for test
         return "None";
     }
     int IDReindex = reindexMap[userID];
     vector<int> userRow = matrix[IDReindex];
     // case1: connected to all the other users
     if (userRow.size() == getOneNumber(userRow) + 1) {
-        cout << "case1: connected to all the other users" << endl; // used for test
+//        cout << "case1: connected to all the other users" << endl; // used for test
         return "None";
     }
 
@@ -290,7 +272,7 @@ string getRecommendation(string countryName, string userID) {
     for (int i = 0; i < userRow.size(); i++) {
         if (i == IDReindex || userRow[i] == 1) { continue; }
         nonNeighbourIndex.insert(i);
-        cout << "nodes are not neighbour: " << indexToID[i] << endl;
+//        cout << "nodes are not neighbour: " << indexToID[i] << endl;
     }
 
     // get common neighbours row index
@@ -300,7 +282,7 @@ string getRecommendation(string countryName, string userID) {
         if (i == IDReindex || nonNeighbourIndex.count(i) == 0) { continue; }
         if (getComNeighbours(userRow, matrix[i]) != 0) {
             comNeighbourRowIndex.push_back(i);
-            cout << "nodes have common neighbour: " << indexToID[i] << endl;
+//            cout << "nodes have common neighbour: " << indexToID[i] << endl;
         }
 
     }
@@ -328,7 +310,7 @@ string getRecommendation(string countryName, string userID) {
             }
         }
 
-        cout << "case 2.a: no n shares any common neighbor with u" << endl; // used for test
+//        cout << "case 2.a: no n shares any common neighbor with u" << endl; // used for test
         return to_string(indexToID[highestDegreeID]);
     }
 
@@ -343,7 +325,7 @@ string getRecommendation(string countryName, string userID) {
             mostComNeighbourID = comNeighbourIndex;
         }
     }
-    cout << "case2.b: some n shares some common neighbors with u" << endl; // used for test
+//    cout << "case2.b: some n shares some common neighbors with u" << endl; // used for test
     return to_string(indexToID[mostComNeighbourID]);
 }
 
@@ -371,11 +353,11 @@ int getComNeighbours(vector<int> array1, vector<int> array2) {
 void bootUpServerB() {
     string countryList = "";
     for (auto it = fileMap.begin(); it != fileMap.end(); ++it) {
-        cout << "debug info: " << countryList << endl;
+//        cout << "debug info: " << countryList << endl;
         countryList += it->first + "|";
     }
     countryList = countryList.substr(0, countryList.length() - 1);
-    cout << "country list is: "<< countryList << endl;
+//    cout << "country list is: "<< countryList << endl;
     if(::sendto(sockfdUDP,countryList.c_str(), MAX_DATA_SIZE, 0, (struct sockaddr *) &clientBddrUDP, sizeof(clientBddrUDP)) == ERROR_FLAG) {
         perror("serverB response failed");
         exit(1);
