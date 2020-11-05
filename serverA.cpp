@@ -2,10 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <string.h>
-#include <netdb.h>
-#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -17,7 +14,6 @@
 #include <unordered_set>
 #include <algorithm>
 #include <tuple>
-#include <cstring>
 
 using namespace std;
 
@@ -26,57 +22,86 @@ using namespace std;
 #define MAX_DATA_SIZE 1024
 #define ERROR_FLAG -1
 #define FILE_NAME "data1.txt"
-#define COUNTRY "xYz" // used for test
-#define USER "0"
 
-//const string FILE_NAME = "testcases/testcase3/data1.txt";
-//const string FILE_NAME = "test1.txt";
+int sockfdUDP; // UDP socket
+struct sockaddr_in serverAddrUDP, clientAddrUDP;  // serverA and mainserver address for UDP connection
+char recvBuf[MAX_DATA_SIZE]; // query message from mainserver
+unordered_map<string, vector<vector<int>>> fileMap;  // the map that stores the information about social network
+                                                    // (key: country, value: adjacency matrix)
+unordered_map<string, unordered_map<string, int>> indexMap; // the map that stores the index relation
+                                                            // (key: country, value: index map[userID -> reindex])
+unordered_map<string, vector<int>> indexToIDMap; // the map that stores the reindex relation
+                                                // (key: country, value: reindex[reindex ->userID])
+unordered_map<string, unordered_set<string>> eachCountryMap; // used for each iteration to store the information for each country
 
-int sockfdUDP;
-struct sockaddr_in serverAddrUDP, clientAddrUDP;
-char recvBuf[MAX_DATA_SIZE];
+/**
+ * this method converts the social network into graphs(adjacency matrix)
+ */
+void processFiles();
 
+/**
+ * create UDP socket
+ */
+void createUDPSocket();
 
-unordered_map<string, vector<vector<int>>> fileMap;
-unordered_map<string, unordered_map<string, int>> indexMap;
-unordered_map<string, vector<int>> indexToIDMap;
-unordered_map<string, unordered_set<string>> eachCountryMap;
+/**
+ * boot up operation for server A
+ */
+void bootUpServerA();
 
+/**
+ *
+ * @param array the array to count the one number of it(get one node's degree)
+ * @return the number of one in the array
+ */
 int getOneNumber(vector<int> array);
+
+/**
+ *
+ * @param array1 one array to get the common neighbours
+ * @param array2 the other array to get the common neighbours
+ * @return the number of common neighbours of these two array
+ */
 int getComNeighbours(vector<int> array1, vector<int> array2);
 
-
-void createUDPSocket();
-//void processFiles(unordered_map<string, vector<vector<int>>> fileMap,
-//                  unordered_map<string, unordered_map<string, int>> indexMap,
-//                  unordered_map<string, unordered_set<string>> eachCountryMap);
-void processFiles();
-void bootUpServerA();
+/**
+ *  send recommendation result back to servermain
+ * @param result the result will send back to servermain
+ * @param userID the userID that the client inputs
+ * @param countryName the country name that the client inputs
+ */
 void sendResult(string result, string userID, string countryName);
 
+/**
+ * This method helps to get adjacency matrix
+ * @param map key is every country user ID, value is the userID line
+ * @return reIndexMap: ID -> index
+ */
 tuple<unordered_map<string, int>, vector<vector<int>>, vector<int>> getAdjacencyMatrix(unordered_map<string, unordered_set<string>> map);
+
+/**
+ *
+ * @param countryName the country name that the client inputs
+ * @param userID the userID that the client inputs
+ * @return the recommendation userID(it should be "None" or userID)
+ */
 string getRecommendation(string countryName, string userID);
 
 
 int main() {
 
-
     processFiles();
-
     // create UDP socket for server A
     createUDPSocket();
-
     while(true)
     {
         // receive data from main server
-//        cout << "size of recvBuf: " << sizeof(recvBuf) << endl;
         memset(recvBuf,'\0',sizeof(recvBuf));
         socklen_t serverAUDPLen = sizeof(clientAddrUDP);
         if (::recvfrom(sockfdUDP, recvBuf, MAX_DATA_SIZE, 0, (struct sockaddr *) &clientAddrUDP, &serverAUDPLen) == ERROR_FLAG) {
             perror("serverA receive failed");
             exit(1);
         }
-//        printf("The Server A received input <%s>\n", recvBuf); // debug Test
         string recvMsg = recvBuf;
         // boot up message
         if (recvMsg == "Bootup") {
@@ -90,16 +115,10 @@ int main() {
             splitStr = strtok(NULL,"|");
             countryName = splitStr;
 
-//            /* debug info */
-//            cout << endl;
-//            cout << "userID is: " << userID << endl;
-//            cout << "countryName is: "<< countryName << endl;
-//            cout << endl;
-//            /*  debug info */
             cout << "The server A has received request for finding possible friends of User " << userID << " in " << countryName << endl;
+            cout << endl;
             // get recommendation
             string result = getRecommendation(countryName, userID);
-//            cout << "recommendation is: " << result << endl;
             // send query result back to mainserver
             sendResult(result, userID, countryName);
         }
@@ -110,13 +129,8 @@ int main() {
 }
 
 /**
- * this method converts the social network into graphs
+ * this method converts the social network into graphs(adjacency matrix)
  *
- * @param fileMap is the map that stores the information about social network,
- *        key is country name and value is the graph for every country
- * @param indexMap is the map that stores the index relation,
- *        key is country name and value is the index map for every country
- * @param eachCountryMap the network infomation for each country
  */
 void processFiles() {
     ifstream inFile(FILE_NAME,ios::in);
@@ -141,7 +155,6 @@ void processFiles() {
                 continue;
             }
             lineArray.push_back(str);
-
             // use set to for deduplication
             lineSet.insert(str);
         }
@@ -173,7 +186,6 @@ void processFiles() {
     indexToIDMap[countryName] = get<2>(getAdjacencyMatrix(eachCountryMap));
 
 }
-
 
 /**
  * This method helps to get adjacency matrix
@@ -213,21 +225,6 @@ tuple<unordered_map<string, int>, vector<vector<int>>, vector<int>> getAdjacency
         }
         matrix.push_back(temp);
     }
-//    // print the map and the adjacency matrix
-//    for (auto it = map.begin(); it != map.end(); ++it) {
-//        cout << it->first << ":";
-//        for (auto its = it->second.begin(); its != it->second.end(); ++its) {
-//            cout << " " << *its;
-//        }
-//        cout << endl;
-//    }
-//
-//    for (int i = 0; i < size; i++) {
-//        for (int j = 0; j < size; j++) {
-//            cout << matrix[i][j];
-//        }
-//        cout << endl;
-//    }
 
     // get ID to Index vector(value is ID)
     for (int i = 0; i < size; i++) {
@@ -239,16 +236,20 @@ tuple<unordered_map<string, int>, vector<vector<int>>, vector<int>> getAdjacency
 
 }
 
-//Create a UDP socket
-void createUDPSocket()
-{
+
+/**
+ * create an UDP socket
+ */
+void createUDPSocket() {
     sockfdUDP = socket(AF_INET, SOCK_DGRAM, 0);
     //test if create a socket successfully
     if(sockfdUDP == ERROR_FLAG){
         perror("ServerA UDP socket");
         exit(1);
     }
-    // make sure the struct is empty
+
+    // from beej's tutorial
+    // initialize IP address, port number
     memset(&serverAddrUDP, 0, sizeof(serverAddrUDP));
     serverAddrUDP.sin_family = AF_INET;
     serverAddrUDP.sin_port   = htons(SERVER_A_UDP_PORT);
@@ -260,9 +261,17 @@ void createUDPSocket()
         exit(1);
     }
     cout << "The Server A is up and running using UDP on port "<< SERVER_A_UDP_PORT << "." << endl;
+    cout << endl;
+
 }
 
 
+/**
+ *
+ * @param countryName the country name that the client inputs
+ * @param userID the userID that the client inputs
+ * @return the recommendation userID(it should be "None" or userID)
+ */
 string getRecommendation(string countryName, string userID) {
     vector<vector<int>> matrix = fileMap[countryName];
     unordered_map<string, int> reindexMap = indexMap[countryName];
@@ -273,14 +282,12 @@ string getRecommendation(string countryName, string userID) {
     }
     // case1.a: only user in the graph
     if (matrix.size() == 1) {
-//        cout << "case1.a: only user in the graph" << endl; // used for test
         return "None";
     }
     int IDReindex = reindexMap[userID];
     vector<int> userRow = matrix[IDReindex];
     // case1: connected to all the other users
     if (userRow.size() == getOneNumber(userRow) + 1) {
-//        cout << "case1: connected to all the other users" << endl; // used for test
         return "None";
     }
 
@@ -289,7 +296,7 @@ string getRecommendation(string countryName, string userID) {
     for (int i = 0; i < userRow.size(); i++) {
         if (i == IDReindex || userRow[i] == 1) { continue; }
         nonNeighbourIndex.insert(i);
-//        cout << "nodes are not neighbour: " << indexToID[i] << endl;
+//        cout << "nodes are not neighbour: " << indexToID[i] << endl; // used for test
     }
 
     // get common neighbours row index
@@ -299,7 +306,7 @@ string getRecommendation(string countryName, string userID) {
         if (i == IDReindex || nonNeighbourIndex.count(i) == 0) { continue; }
         if (getComNeighbours(userRow, matrix[i]) != 0) {
             comNeighbourRowIndex.push_back(i);
-//            cout << "nodes have common neighbour: " << indexToID[i] << endl;
+//            cout << "nodes have common neighbour: " << indexToID[i] << endl; // used for test
         }
 
     }
@@ -346,7 +353,11 @@ string getRecommendation(string countryName, string userID) {
     return to_string(indexToID[mostComNeighbourID]);
 }
 
-
+/**
+ *
+ * @param array the array to count the one number of it(get one node's degree)
+ * @return the number of one in the array
+ */
 int getOneNumber(vector<int> array) {
     int count = 0;
     for (int i = 0; i < array.size(); i++) {
@@ -357,6 +368,12 @@ int getOneNumber(vector<int> array) {
     return count;
 }
 
+/**
+ *
+ * @param array1 one array to get the common neighbours
+ * @param array2 the other array to get the common neighbours
+ * @return the number of common neighbours of these two array
+ */
 int getComNeighbours(vector<int> array1, vector<int> array2) {
     int count = 0;
     for (int i = 0; i < array1.size(); i++) {
@@ -367,24 +384,34 @@ int getComNeighbours(vector<int> array1, vector<int> array2) {
     return count;
 }
 
+/**
+ * boot up operation for server A(send the country list to mainserver)
+ */
 void bootUpServerA() {
     string countryList = "";
     for (auto it = fileMap.begin(); it != fileMap.end(); ++it) {
-//        cout << "debug info: " << countryList << endl;
         countryList += it->first + "|";
     }
     countryList = countryList.substr(0, countryList.length() - 1);
-//    cout << "country list is: "<< countryList << endl;
     if(::sendto(sockfdUDP,countryList.c_str(), MAX_DATA_SIZE, 0, (struct sockaddr *) &clientAddrUDP, sizeof(clientAddrUDP)) == ERROR_FLAG) {
         perror("serverA response failed");
         exit(1);
     }
     cout << "The server A has sent a country list to Main Server" << endl;
+    cout << endl;
+
 }
 
+/**
+ *  send recommendation result back to servermain
+ * @param result the result will send back to servermain
+ * @param userID the userID that the client inputs
+ * @param countryName the country name that the client inputs
+ */
 void sendResult(string result, string userID, string countryName) {
     if (result == "userIDNF") {
         cout << "User " << userID << " does not show up in "<< countryName << endl;
+        cout << endl;
         // send data to main server
         string message = result;
         if(::sendto(sockfdUDP,message.c_str(), MAX_DATA_SIZE, 0, (struct sockaddr *) &clientAddrUDP, sizeof(clientAddrUDP)) == ERROR_FLAG) {
@@ -392,16 +419,21 @@ void sendResult(string result, string userID, string countryName) {
             exit(1);
         }
         cout << "The server A has sent User "<< userID << " not found to Main Server" << endl;
+        cout << endl;
 
     } else {
         // send data to main server
         cout << "The server A is searching possible friends for User " << userID << "..." <<endl;
         cout << "Here are the results: User "<< result << endl;
+        cout << endl;
+
         string message = result;
         if(::sendto(sockfdUDP,message.c_str(), MAX_DATA_SIZE, 0, (struct sockaddr *) &clientAddrUDP, sizeof(clientAddrUDP)) == ERROR_FLAG) {
             perror("serverA response failed");
             exit(1);
         }
         cout << "The server A has sent the result(s) to Main Server" << endl;
+        cout << endl;
+
     }
 }
