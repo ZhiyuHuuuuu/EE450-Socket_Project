@@ -128,7 +128,6 @@ int main() {
      **********************************************************************************/
     countryForA = bootUpServerA(countryForA);
     countryForB = bootUpServerB(countryForB);
-
     // print out country list
     printCountryList(countryForA, countryForB);
 
@@ -458,8 +457,8 @@ void sendAResultToClient(string userID, string country) {
  */
 void sendBResultToClient(string userID, string country) {
     cout << "The Main Server has sent request from User ";
-    cout <<  userID << "to server B ";
-    cout << "using UDP over port" <<  MAIN_UDP_PORT << endl;
+    cout <<  userID << " to server B ";
+    cout << "using UDP over port " <<  MAIN_UDP_PORT << endl;
     cout << endl;
     string input = userID + "|" + country;
 //    cout << "input in sendBResultToClient is: "<< input<< endl; // used for test

@@ -418,7 +418,7 @@ void sendResult(string result, string userID, string countryName) {
             perror("serverA response failed");
             exit(1);
         }
-        cout << "The server A has sent User "<< userID << " not found to Main Server" << endl;
+        cout << "The server A has sent \"User "<< userID << " not found\" to Main Server" << endl;
         cout << endl;
 
     } else {

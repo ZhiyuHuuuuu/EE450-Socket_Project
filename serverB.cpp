@@ -420,7 +420,7 @@ void sendResult(string result, string userID, string countryName) {
             perror("serverB response failed");
             exit(1);
         }
-        cout << "The server B has sent User "<< userID << " not found to Main Server" << endl;
+        cout << "The server B has sent \"User "<< userID << " not found\" to Main Server" << endl;
         cout << endl;
 
 

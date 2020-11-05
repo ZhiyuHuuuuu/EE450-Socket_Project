@@ -1,11 +1,15 @@
 # EE450-Socket_Project
 
-#### Personal Information
+#### File Path
 
-Full Name: ZHIYU HU
+The backend server need to get data during the boot-up phase and the **data file paths**(they should be put into the same dir path of the project) are:
 
-Student ID:3288624500
+​	serverA: “./data1.txt”
 
+​	serverB: “./data2.txt”
+
+And "sample_queries.txt" is just used for test(it contains the result for some query)   
+ 
 #### What I have done in the assignment
 
 I have already finished requires phases in description:
@@ -109,4 +113,6 @@ The max length of buffers are set to 1024. If the query message exceeds this siz
 
 1. The **implementation of TCP and UDP** (such as  “ create socket” , “bind()”, “sendto()”, “recvfrom()”…)  refers to the “Beej’s Guide to Network Programming” tutorial;
 2. The use of  fork() function to deal with multiple clients refers to a video in youtube(https://www.youtube.com/watch?v=BIJGSQEipEE);
+
+
 
