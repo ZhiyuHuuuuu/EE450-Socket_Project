@@ -4,9 +4,9 @@
 
 The backend server need to get data during the boot-up phase and the **data file paths**(they should be put into the same dir path of the project) are:
 
-​	serverA: “./data1.txt”
+​	 serverA: “./data1.txt”
 
-​	serverB: “./data2.txt”
+​	 serverB: “./data2.txt”
 
 And "sample_queries.txt" is just used for test(it contains the result for some query)   
  
