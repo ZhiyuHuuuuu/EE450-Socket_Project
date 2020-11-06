@@ -1,6 +1,6 @@
 # EE450-Socket_Project
 
-#### File Path
+### File Path
 
 The backend server need to get data during the boot-up phase and the **data file paths**(they should be put into the same dir path of the project) are:
 
@@ -10,7 +10,7 @@ The backend server need to get data during the boot-up phase and the **data file
 
 And "sample_queries.txt" is just used for test(it contains the result for some query)   
  
-#### What I have done in the assignment
+### What I have done in the assignment
 
 I have already finished requires phases in description:
 
@@ -37,7 +37,7 @@ I have already finished requires phases in description:
 - Main server prepares a reply message and sends it to the Client;
 - Clients receive the recommendation from Main server and display the corresponding information
 
-#### Code Files and their functions
+### Code Files and their functions
 
 - **client.cpp:** 
 
@@ -69,7 +69,7 @@ I have already finished requires phases in description:
 
     Code for backend server B connected with Main server by UDP. It is almost the same with serverA.cpp except the UDP port number;
 
-#### Format of message exchange
+### Format of message exchange
 
 The message print on screen is the same as the requirement in project description;
 
@@ -105,11 +105,11 @@ For Main server:
 
    It will send the same recommendation message from backend server to clients (i.e. **“userIDNF”** or **“None”** or the **UserID**)
 
-#### Idiosyncrasy in project
+### Idiosyncrasy in project
 
 The max length of buffers are set to 1024. If the query message exceeds this size , the program will crash. (It is **not possible** in this project for the assumption: “The length of the name can vary from 1 letter to at most 20 letters.”)
 
-#### Resued Code
+### Resued Code
 
 1. The **implementation of TCP and UDP** (such as  “ create socket” , “bind()”, “sendto()”, “recvfrom()”…)  refers to the “Beej’s Guide to Network Programming” tutorial;
 2. The use of  fork() function to deal with multiple clients refers to a video in youtube(https://www.youtube.com/watch?v=BIJGSQEipEE);
